@@ -1,0 +1,44 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>LCARS Display</title>
+<style>
+body{margin:0;background:#000;color:#f5d6a0;font-family:Arial,sans-serif;overflow:hidden}.screen{min-height:100vh;display:grid;grid-template-columns:180px 1fr;gap:24px;padding:24px;box-sizing:border-box}
+.left-column{display:flex;flex-direction:column;gap:18px}.alert-light-panel{background:#1a1a1a;border-radius:30px;padding:18px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;border-left:18px solid #cc99cc}
+.alert-light{width:72px;height:72px;border-radius:50%;opacity:.25}.alert-label{font-size:20px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:#ffb26b;text-align:center}.active{opacity:1;animation:pulse 1s infinite ease-in-out}
+@keyframes pulse{0%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.1);filter:brightness(1.5)}100%{transform:scale(1);filter:brightness(1)}}
+.main-panel{display:flex;flex-direction:column;gap:24px}.title-box{background:#1a1a1a;border-radius:28px;padding:20px 28px;border-left:28px solid #ff9966}.title-box h1{margin:0;font-size:46px;letter-spacing:2px;color:#ffcc99;line-height:1.05}.registry{margin-top:8px;font-size:24px;letter-spacing:3px;color:#d6a77a;text-transform:uppercase}
+.stats-grid{display:grid;grid-template-columns:1fr 240px;gap:20px}.stat-card,.alert-card,.subsystem-card{background:#141414;border-radius:28px;padding:22px 24px}.stat-card{border-left:24px solid #6699cc}.alert-card{border-left:24px solid #cc6666;display:flex;flex-direction:column;justify-content:center;align-items:center}.subsystem-card{border-left:24px solid #9966cc}
+.stat-row{margin-bottom:26px}.stat-row:last-child{margin-bottom:0}.stat-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}.stat-name{font-size:26px;color:#ffb26b;font-weight:bold;letter-spacing:1px}.stat-number{font-size:42px;color:#9fd4ff;font-weight:bold}
+.bar{height:34px;background:#2a2a2a;border-radius:18px;overflow:hidden}.fill{height:100%;width:0%;background:linear-gradient(90deg,#ff9966,#ffcc66);transition:width .25s ease}
+#alertText{font-size:48px;font-weight:bold;letter-spacing:2px;text-align:center}.subtext{margin-top:10px;font-size:18px;color:#cc99cc;text-transform:uppercase;letter-spacing:2px;text-align:center}.green{color:#99ff99}.yellow{color:#ffe066}.red{color:#ff6666}
+.subsystem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.subsystem-line{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#1d1d1d;border-radius:14px;padding:10px 12px}.subsystem-name{color:#ffb26b;font-weight:bold;text-transform:uppercase;font-size:14px;letter-spacing:1px}
+.pill{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase}.pill.online{background:#193322;color:#8cffb0}.pill.degraded{background:#3a2d10;color:#ffd86b}.pill.offline{background:#3a1414;color:#ff8f8f}
+.audio-button{position:fixed;right:24px;bottom:24px;background:#ff9966;color:#111;border:none;border-radius:14px;padding:14px 18px;font-size:18px;font-weight:bold;cursor:pointer;z-index:999;box-shadow:0 0 18px rgba(255,153,102,.35)}
+.audio-status{position:fixed;right:24px;bottom:78px;color:#cc99cc;font-size:14px;letter-spacing:1px;text-transform:uppercase;z-index:999;background:rgba(0,0,0,.65);padding:8px 10px;border-radius:10px}
+</style></head><body>
+<div class="screen"><div class="left-column">
+<div class="alert-light-panel"><div id="comms" class="alert-light" style="background:cyan;"></div><div class="alert-label">Comms</div></div>
+<div class="alert-light-panel"><div id="sensors" class="alert-light" style="background:#b266ff;"></div><div class="alert-label">Sensors</div></div>
+<div class="alert-light-panel"><div id="tactical" class="alert-light" style="background:red;"></div><div class="alert-label">Tactical</div></div>
+</div><div class="main-panel">
+<div class="title-box"><h1 id="shipName">USS MERIDIAN</h1><div class="registry" id="registry">NCC-0000</div></div>
+<div class="stats-grid"><div class="stat-card">
+<div class="stat-row"><div class="stat-header"><div class="stat-name">Hull</div><div class="stat-number" id="hullNumber">100 / 100</div></div><div class="bar"><div id="hullBar" class="fill"></div></div></div>
+<div class="stat-row"><div class="stat-header"><div class="stat-name">Shields</div><div class="stat-number" id="shieldsNumber">110 / 110</div></div><div class="bar"><div id="shieldsBar" class="fill"></div></div></div>
+</div><div class="alert-card"><div id="alertText" class="green">GREEN</div><div class="subtext">Ship Alert Status</div></div></div>
+<div class="subsystem-card"><div class="stat-header"><div class="stat-name">Subsystem Status</div><div class="subtext" style="margin:0;">Online / Degraded / Offline</div></div><div class="subsystem-grid" id="subsystemGrid"></div></div>
+</div></div>
+<div class="audio-status" id="audioStatus">Audio locked</div><button class="audio-button" id="enableAudioBtn">Enable Audio</button>
+<script src="/socket.io/socket.io.js"></script><script>
+const socket=io(); let audioCtx=null, audioEnabled=false;
+const subsystemNames={engines:"Engines",weapons:"Weapons",sensors:"Sensors",comms:"Comms",deflector:"Deflector",lifesupport:"Life Support",transporters:"Transporters"};
+function getSubsystemStatus(v){if(v<=33)return"offline"; if(v<=66)return"degraded"; return"online";}
+function renderSubsystems(subsystems){document.getElementById('subsystemGrid').innerHTML=Object.keys(subsystems).map(key=>{const status=getSubsystemStatus(subsystems[key]);return `<div class="subsystem-line"><div class="subsystem-name">${subsystemNames[key]}</div><div class="pill ${status}">${status}</div></div>`}).join('')}
+function setAlertColor(v){const el=document.getElementById('alertText');el.textContent=v;el.classList.remove('green','yellow','red');if(v==='RED')el.classList.add('red');else if(v==='YELLOW')el.classList.add('yellow');else el.classList.add('green')}
+function updateAudioStatus(){document.getElementById('audioStatus').textContent=audioEnabled?'Audio enabled':'Audio locked';document.getElementById('enableAudioBtn').textContent=audioEnabled?'Audio Enabled':'Enable Audio'}
+async function initAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();audioEnabled=true;updateAudioStatus();playStationChime()}
+function playTone(freq,start,duration,type='sine',gainValue=0.06){if(!audioEnabled||!audioCtx)return;const osc=audioCtx.createOscillator();const gain=audioCtx.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,start);gain.gain.setValueAtTime(0.0001,start);gain.gain.exponentialRampToValueAtTime(gainValue,start+0.01);gain.gain.exponentialRampToValueAtTime(0.0001,start+duration);osc.connect(gain);gain.connect(audioCtx.destination);osc.start(start);osc.stop(start+duration+0.02)}
+function playStationChime(){if(!audioEnabled||!audioCtx)return;const now=audioCtx.currentTime+0.02;playTone(932.33,now,0.08,'sine',0.05);playTone(1244.51,now+0.09,0.10,'triangle',0.04);playTone(1567.98,now+0.21,0.16,'sine',0.035)}
+function playRedAlertKlaxonTNG(){if(!audioEnabled||!audioCtx)return;const base=audioCtx.currentTime+0.03;for(let i=0;i<4;i++){const t=base+(i*0.78);playTone(739.99,t,0.15,'sawtooth',0.06);playTone(587.33,t+0.16,0.15,'square',0.045);playTone(739.99,t+0.34,0.15,'sawtooth',0.06);playTone(587.33,t+0.50,0.15,'square',0.045)}}
+document.getElementById('enableAudioBtn').addEventListener('click',initAudio); updateAudioStatus();
+socket.on('update',state=>{document.getElementById('shipName').textContent=state.shipName||'USS MERIDIAN';document.getElementById('registry').textContent=state.registry||'NCC-0000';const hullPct=Math.max(0,Math.min(100,(state.hull/state.hullMax)*100));const shieldsPct=Math.max(0,Math.min(100,(state.shields/state.shieldsMax)*100));document.getElementById('hullBar').style.width=hullPct+'%';document.getElementById('shieldsBar').style.width=shieldsPct+'%';document.getElementById('hullNumber').textContent=state.hull+' / '+state.hullMax;document.getElementById('shieldsNumber').textContent=state.shields+' / '+state.shieldsMax;setAlertColor(state.alert);renderSubsystems(state.subsystems);['comms','sensors','tactical'].forEach(type=>document.getElementById(type).classList.toggle('active',!!state.alerts[type]))});
+socket.on('soundEvent',payload=>{if(!audioEnabled)return; if(payload.type==='station')playStationChime(); if(payload.type==='redAlert')playRedAlertKlaxonTNG()});
+</script></body></html>

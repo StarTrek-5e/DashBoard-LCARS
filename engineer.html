@@ -1,0 +1,32 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>USS Meridian Engineer Console</title>
+<style>
+body{background:#000;color:#f5d6a0;font-family:Arial,sans-serif;padding:24px;margin:0}.shell{max-width:1100px;margin:0 auto;display:grid;gap:24px}
+.panel{background:#111;border-radius:24px;padding:20px 24px;border-left:24px solid #ff9966;box-shadow:0 0 0 2px #331a4d inset}
+h1,h2{margin:0 0 10px 0;color:#ffb26b}.sub{color:#cc99cc;text-transform:uppercase;letter-spacing:2px;font-size:14px}
+.labelrow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}.name{font-size:28px;font-weight:bold;color:#ffb26b}.number{font-size:38px;font-weight:bold;color:#9fd4ff}
+input[type=range]{width:100%}.controls{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+button{background:#ff9966;color:#111;border:none;border-radius:14px;padding:12px 16px;font-size:18px;font-weight:bold;cursor:pointer;min-width:110px}
+.small{font-size:15px;color:#d6a77a}.status-bar{height:28px;background:#2a2a2a;border-radius:14px;overflow:hidden;margin-top:10px}
+.fill{height:100%;width:0%;background:linear-gradient(90deg,#ff9966,#ffcc66);transition:width .2s ease}.subsystem-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.subsystem-card{background:#181818;border-radius:18px;padding:14px;border-left:16px solid #9966cc}.subsystem-card .name{font-size:22px}.mini .controls button{min-width:78px;padding:10px 12px;font-size:15px}.mini .number{font-size:28px}
+</style></head><body><div class="shell">
+<div class="panel"><h1 id="shipName">USS MERIDIAN</h1><div class="sub">Engineer Console • <span id="registry">NCC-0000</span></div><div class="small" style="margin-top:8px;">This console can update Hull, Shields, and subsystem HP.</div></div>
+<div class="panel"><div class="labelrow"><div class="name">Hull Integrity</div><div class="number" id="hullNumber">100 / 100</div></div><input type="range" min="0" max="100" id="hull" value="100"><div class="controls"><button onclick="adjust('hull',-10)">Hull -10</button><button onclick="adjust('hull',-5)">Hull -5</button><button onclick="adjust('hull',-1)">Hull -1</button><button onclick="adjust('hull',1)">Hull +1</button><button onclick="adjust('hull',5)">Hull +5</button><button onclick="adjust('hull',10)">Hull +10</button></div><div class="status-bar"><div id="hullBar" class="fill"></div></div></div>
+<div class="panel"><div class="labelrow"><div class="name">Shields</div><div class="number" id="shieldsNumber">110 / 110</div></div><input type="range" min="0" max="110" id="shields" value="110"><div class="controls"><button onclick="adjust('shields',-10)">Shields -10</button><button onclick="adjust('shields',-5)">Shields -5</button><button onclick="adjust('shields',-1)">Shields -1</button><button onclick="adjust('shields',1)">Shields +1</button><button onclick="adjust('shields',5)">Shields +5</button><button onclick="adjust('shields',10)">Shields +10</button></div><div class="status-bar"><div id="shieldsBar" class="fill"></div></div></div>
+<div class="panel"><h2>Subsystem Integrity</h2><div class="subsystem-grid" id="subsystemGrid"></div></div>
+</div>
+<script src="/socket.io/socket.io.js"></script><script>
+const socket=io();
+const subsystemNames={engines:"Engines",weapons:"Weapons",sensors:"Sensors",comms:"Comms",deflector:"Deflector",lifesupport:"Life Support",transporters:"Transporters"};
+let state={shipName:"USS MERIDIAN",registry:"NCC-0000",hull:100,hullMax:100,shields:110,shieldsMax:110,alert:"GREEN",alerts:{comms:false,sensors:false,tactical:false},subsystems:{engines:100,weapons:100,sensors:100,comms:100,deflector:100,lifesupport:100,transporters:100}};
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function renderSubsystems(){document.getElementById('subsystemGrid').innerHTML=Object.keys(state.subsystems).map(key=>`<div class="subsystem-card mini"><div class="labelrow"><div class="name">${subsystemNames[key]}</div><div class="number">${state.subsystems[key]} / 100</div></div><input type="range" min="0" max="100" value="${state.subsystems[key]}" oninput="setSubsystem('${key}', this.value)"><div class="controls"><button onclick="adjustSubsystem('${key}',-10)">-10</button><button onclick="adjustSubsystem('${key}',-5)">-5</button><button onclick="adjustSubsystem('${key}',-1)">-1</button><button onclick="adjustSubsystem('${key}',1)">+1</button><button onclick="adjustSubsystem('${key}',5)">+5</button><button onclick="adjustSubsystem('${key}',10)">+10</button></div><div class="status-bar"><div style="height:100%;width:${state.subsystems[key]}%;background:linear-gradient(90deg,#ff9966,#ffcc66);"></div></div></div>`).join('')}
+function render(){document.getElementById('shipName').textContent=state.shipName||'USS MERIDIAN';document.getElementById('registry').textContent=state.registry||'NCC-0000';document.getElementById('hull').value=state.hull;document.getElementById('shields').value=state.shields;document.getElementById('hullNumber').textContent=state.hull+' / '+state.hullMax;document.getElementById('shieldsNumber').textContent=state.shields+' / '+state.shieldsMax;document.getElementById('hullBar').style.width=((state.hull/state.hullMax)*100)+'%';document.getElementById('shieldsBar').style.width=((state.shields/state.shieldsMax)*100)+'%';renderSubsystems()}
+function sendEngineerUpdate(){socket.emit('update',{hull:state.hull,shields:state.shields,subsystems:state.subsystems})}
+function adjust(type,delta){if(type==='hull')state.hull=clamp(state.hull+delta,0,state.hullMax);else state.shields=clamp(state.shields+delta,0,state.shieldsMax);render();sendEngineerUpdate()}
+function adjustSubsystem(type,delta){state.subsystems[type]=clamp(state.subsystems[type]+delta,0,100);render();sendEngineerUpdate()}
+function setSubsystem(type,value){state.subsystems[type]=clamp(Number(value),0,100);render();sendEngineerUpdate()}
+document.getElementById('hull').addEventListener('input',e=>{state.hull=clamp(Number(e.target.value),0,state.hullMax);render();sendEngineerUpdate()});
+document.getElementById('shields').addEventListener('input',e=>{state.shields=clamp(Number(e.target.value),0,state.shieldsMax);render();sendEngineerUpdate()});
+socket.on('update',newState=>{state=newState;render()}); render();
+</script></body></html>

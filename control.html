@@ -1,0 +1,80 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>LCARS Control</title>
+<style>
+body{background:#000;color:#f5d6a0;font-family:Arial,sans-serif;padding:24px}
+h1,h2{color:#ffb26b;margin-top:0}.section{margin-bottom:24px;padding:16px;border:2px solid #663399;border-radius:16px;max-width:1100px;background:#111}
+.row{margin:14px 0}label{display:inline-block;width:120px;font-weight:bold;vertical-align:middle}
+input[type=range]{width:320px;vertical-align:middle}input[type=text]{width:260px;padding:8px 10px;border-radius:8px;border:none;background:#f5d6a0;color:#111;font-size:16px}
+.value{display:inline-block;width:90px;text-align:right;margin-left:10px;color:#9fd4ff;font-weight:bold}
+button,select{font-size:16px;padding:10px 14px;margin:6px 8px 6px 0;border-radius:10px;border:none}
+button{background:#ff9966;color:#000;font-weight:bold;cursor:pointer;min-width:120px}.active-btn{background:#99ff99;box-shadow:0 0 12px rgba(153,255,153,.5)}
+button.small{min-width:84px;padding:8px 12px;font-size:15px}select{background:#f5d6a0}.status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.status-card,.subspace-box,.subsystem-card{background:#1a1a1a;border-radius:14px;padding:12px}.status-card{border-left:12px solid #cc99cc}.subspace-box{border-left:12px solid #6699cc}.subsystem-card{border-left:12px solid #9966cc}
+.status-name,.subsystem-name{font-size:16px;font-weight:bold;color:#ffb26b;text-transform:uppercase;margin-bottom:6px}.status-value{font-size:18px;font-weight:bold;color:#888}.on{color:#99ff99}.off{color:#ff7777}
+.hint{color:#cc99cc;font-size:14px;margin-top:8px}code{color:#9fd4ff}.adjust-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;margin-left:120px}
+.subspace-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.subspace-label{color:#cc99cc;font-size:13px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}.subspace-value{color:#9fd4ff;font-size:17px;font-weight:bold}
+.subsystems-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.subsystem-line{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.pill{padding:4px 10px;border-radius:999px;font-size:12px;font-weight:bold;letter-spacing:1px;text-transform:uppercase}.pill.online{background:#193322;color:#8cffb0}.pill.degraded{background:#3a2d10;color:#ffd86b}.pill.offline{background:#3a1414;color:#ff8f8f}
+</style></head><body>
+<h1>USS MERIDIAN CONTROL</h1>
+<div class="section"><h2>Subspace Link Monitor</h2><div class="subspace-grid">
+<div class="subspace-box"><div class="subspace-label">Connected Node</div><div class="subspace-value" id="nodeValue">—</div></div>
+<div class="subspace-box"><div class="subspace-label">Link Status</div><div class="subspace-value" id="linkValue">INITIALIZING</div></div>
+<div class="subspace-box"><div class="subspace-label">Latency</div><div class="subspace-value" id="latencyValue">—</div></div>
+<div class="subspace-box"><div class="subspace-label">Channel Integrity</div><div class="subspace-value" id="integrityValue">—</div></div>
+<div class="subspace-box"><div class="subspace-label">Last Poll</div><div class="subspace-value" id="lastPollValue">—</div></div>
+</div><div class="hint">This polls <code>/status</code> every 10 seconds.</div></div>
+
+<div class="section"><h2>Ship Identity</h2>
+<div class="row"><label for="shipName">Ship Name</label><input type="text" id="shipName" value="USS MERIDIAN"></div>
+<div class="row"><label for="registry">Registry</label><input type="text" id="registry" value="NCC-0000"></div></div>
+
+<div class="section"><h2>Ship Status</h2>
+<div class="row"><label for="hull">Hull</label><input type="range" min="0" max="100" id="hull" value="100"><span class="value" id="hullValue">100 / 100</span></div>
+<div class="adjust-row">
+<button class="small" onclick="adjust('hull',-10)">Hull -10</button><button class="small" onclick="adjust('hull',-5)">Hull -5</button><button class="small" onclick="adjust('hull',-1)">Hull -1</button><button class="small" onclick="adjust('hull',1)">Hull +1</button><button class="small" onclick="adjust('hull',5)">Hull +5</button><button class="small" onclick="adjust('hull',10)">Hull +10</button></div>
+<div class="row"><label for="shields">Shields</label><input type="range" min="0" max="110" id="shields" value="110"><span class="value" id="shieldsValue">110 / 110</span></div>
+<div class="adjust-row">
+<button class="small" onclick="adjust('shields',-10)">Shields -10</button><button class="small" onclick="adjust('shields',-5)">Shields -5</button><button class="small" onclick="adjust('shields',-1)">Shields -1</button><button class="small" onclick="adjust('shields',1)">Shields +1</button><button class="small" onclick="adjust('shields',5)">Shields +5</button><button class="small" onclick="adjust('shields',10)">Shields +10</button></div>
+<div class="hint">Engineer console can also update these values at <code>/engineer.html</code>.</div></div>
+
+<div class="section"><h2>Ship Alert Status</h2>
+<select id="alert"><option>GREEN</option><option>YELLOW</option><option>RED</option></select>
+<button onclick="triggerRedAlertTone()">Replay Red Alert Tone</button></div>
+
+<div class="section"><h2>Bridge Alerts</h2>
+<button id="btn-comms" onclick="toggle('comms')">Toggle Comms</button>
+<button id="btn-sensors" onclick="toggle('sensors')">Toggle Sensors</button>
+<button id="btn-tactical" onclick="toggle('tactical')">Toggle Tactical</button>
+<div class="status-grid">
+<div class="status-card"><div class="status-name">Comms</div><div id="status-comms" class="status-value off">OFF</div></div>
+<div class="status-card"><div class="status-name">Sensors</div><div id="status-sensors" class="status-value off">OFF</div></div>
+<div class="status-card"><div class="status-name">Tactical</div><div id="status-tactical" class="status-value off">OFF</div></div>
+</div></div>
+
+<div class="section"><h2>Subsystem Overview</h2><div class="subsystems-grid" id="subsystemsGrid"></div></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const subsystemNames = {engines:"Engines",weapons:"Weapons",sensors:"Sensors",comms:"Comms",deflector:"Deflector",lifesupport:"Life Support",transporters:"Transporters"};
+let state = {shipName:"USS MERIDIAN",registry:"NCC-0000",hull:100,hullMax:100,shields:110,shieldsMax:110,alert:"GREEN",alerts:{comms:false,sensors:false,tactical:false},subsystems:{engines:100,weapons:100,sensors:100,comms:100,deflector:100,lifesupport:100,transporters:100}};
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function getSubsystemStatus(v){if(v<=33)return"offline"; if(v<=66)return"degraded"; return"online";}
+function renderSubsystemOverview(){
+ document.getElementById('subsystemsGrid').innerHTML = Object.keys(state.subsystems).map(key=>{
+  const value=state.subsystems[key], status=getSubsystemStatus(value);
+  return `<div class="subsystem-card"><div class="subsystem-name">${subsystemNames[key]}</div><div class="subsystem-line"><div class="status-value">${value} / 100</div><div class="pill ${status}">${status}</div></div></div>`;
+ }).join('');
+}
+function updateDisplayedValues(){document.getElementById('hullValue').textContent=document.getElementById('hull').value+' / '+state.hullMax;document.getElementById('shieldsValue').textContent=document.getElementById('shields').value+' / '+state.shieldsMax}
+function updateAlertStatusUI(){['comms','sensors','tactical'].forEach(type=>{const on=!!state.alerts[type];const s=document.getElementById('status-'+type);const b=document.getElementById('btn-'+type);s.textContent=on?'ON':'OFF';s.classList.remove('on','off');s.classList.add(on?'on':'off');b.classList.toggle('active-btn',on)});renderSubsystemOverview()}
+function send(){state.shipName=document.getElementById('shipName').value||'USS MERIDIAN';state.registry=document.getElementById('registry').value||'NCC-0000';state.hull=Number(document.getElementById('hull').value);state.shields=Number(document.getElementById('shields').value);state.alert=document.getElementById('alert').value;updateDisplayedValues();updateAlertStatusUI();socket.emit('update',state)}
+function adjust(type,delta){if(type==='hull'){state.hull=clamp(state.hull+delta,0,state.hullMax);document.getElementById('hull').value=state.hull}else{state.shields=clamp(state.shields+delta,0,state.shieldsMax);document.getElementById('shields').value=state.shields}send()}
+function toggle(type){const on=!state.alerts[type];state.alerts[type]=on;updateAlertStatusUI();socket.emit('update',state);if(on)socket.emit('triggerSound',{type:'station',station:type})}
+function triggerRedAlertTone(){socket.emit('triggerSound',{type:'redAlert'})}
+let previousAlert='GREEN';
+document.querySelectorAll('input, select').forEach(el=>{['input','change'].forEach(ev=>el.addEventListener(ev,()=>{const newAlert=document.getElementById('alert').value;const wasRed=previousAlert==='RED';const isRed=newAlert==='RED';send();if(!wasRed&&isRed)socket.emit('triggerSound',{type:'redAlert'});previousAlert=newAlert}))});
+async function pollStatus(){try{const res=await fetch('/status',{cache:'no-store'});const d=await res.json();document.getElementById('nodeValue').textContent=d.subspaceNode;document.getElementById('linkValue').textContent=d.ok?'STABLE':'DEGRADED';document.getElementById('latencyValue').textContent=d.latencyMs+' ms';document.getElementById('integrityValue').textContent=d.channelIntegrity+'%';document.getElementById('lastPollValue').textContent=new Date().toLocaleTimeString()}catch{document.getElementById('linkValue').textContent='SIGNAL LOST';document.getElementById('nodeValue').textContent='UNKNOWN';document.getElementById('latencyValue').textContent='—';document.getElementById('integrityValue').textContent='0%';document.getElementById('lastPollValue').textContent=new Date().toLocaleTimeString()}}
+socket.on('update',newState=>{state=newState;document.getElementById('shipName').value=state.shipName||'USS MERIDIAN';document.getElementById('registry').value=state.registry||'NCC-0000';document.getElementById('hull').value=state.hull;document.getElementById('shields').value=state.shields;document.getElementById('alert').value=state.alert;previousAlert=state.alert;updateDisplayedValues();updateAlertStatusUI()});
+updateDisplayedValues();updateAlertStatusUI();send();pollStatus();setInterval(pollStatus,10000);
+</script></body></html>
